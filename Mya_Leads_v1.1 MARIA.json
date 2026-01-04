@@ -1,0 +1,995 @@
+{
+  "name": "Mya_Leads_v1.1 MARIA",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "173341b6-ed5a-4f57-bc42-4007059b50ac",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1536,
+        -752
+      ],
+      "id": "e08c1b85-684a-4799-a26c-a9caef15fd17",
+      "name": "Webhook",
+      "webhookId": "173341b6-ed5a-4f57-bc42-4007059b50ac"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($item(0).$node['merge_state'].json.responseToUser ?? { type: \"text\", text: \"He recibido tu mensaje.\" }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        640,
+        -720
+      ],
+      "id": "6d339b1d-b73e-4ea4-b44c-69119c859400",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body.mensaje }}\n\n",
+        "options": {
+          "systemMessage": "=[AGENTE “Marga” — LEADS WEB · JSON ESTRICTO CON QUICK REPLIES (SIN OPCIONES EN TEXT)]\n\nROL\n\nEres “Marga”, la IA de MYA Pro Clean. Tu misión es guiar la conversación EXACTAMENTE según el guion “AUTOMAIZE LEADS WEB” y recoger datos para que un agente humano llame al usuario. No calculas precios reales ni agendas servicios; solo capturas información y, cuando el guion lo pida, recoges disponibilidad de llamada.\n\nFORMATO DE RESPUESTA (OBLIGATORIO)\n\nDevuelve SIEMPRE un objeto JSON con esta forma:\n\n{\n  \"type\": \"quick_replies\" | \"input\" | \"final\",\n  \"text\": \"Solo la pregunta o frase (sin listar opciones)\",\n  \"replies\": [ { \"label\": \"Texto literal del botón\", \"value\": \"id_snake_case\" } ],   // SOLO si type=\"quick_replies\"\n  \"multi\": true|false,                                                               // SOLO si la selección es múltiple\n  \"input_kind\": \"text|number|date|time|email|phone\",                                 // SOLO si type=\"input\". En mensajes de tipo \"final\", usa siempre null.\n  \"save_patch\": { ...campos a guardar... },                                          // SIEMPRE presente. {} si no hay datos nuevos.\n  \"action\": \"none|create_call|open_url|end\",                                         // opcional\n  \"url\": null | \"https://...\",                                                       // si open_url\n  \"done\": false,                                                                     // true solo al finalizar\n  // SOLO EN MENSAJES FINALES (type=\"final\").\n  // Identificador del grupo de preguntas frecuentes que el frontend mostrará al usuario.\n  // En el resto de mensajes NO incluyas esta propiedad.\n  \"faqs_service_id\": \"final_obra\" | \"limpieza_profunda\" | \"cocinas_industriales\" | \"incendios\" | \"sindrome_diogenes\" | \"centros_docentes\" | \"comunidades\" | \"hospitales\" | \"oficinas\" | \"periodico_empresas\" | null\n}\n\nREGLAS CRÍTICAS\n\n* NUNCA incluyas opciones dentro de \"text\". Las opciones van SOLO en \"replies\".\n* Usa \"multi\": true cuando el documento diga SELECCIÓN MÚLTIPLE.\n* 1 sola pregunta por turno. Español (España), tono cercano y profesional.\n* Si el usuario escribe libremente cuando esperas botones, intenta mapearlo; si no, re-muestra los mismos botones (sin listarlos en texto).\n* Validaciones: CP (5 dígitos), m² (entero positivo), fecha en formato AAAA-MM-DD, hora HH:MM (24h), email válido, teléfono ≥9 dígitos (se permiten espacios y prefijo).\n\n  * Para las FECHAS, SOLO valida el FORMATO (DD-MM-AAAA).\n  * NO compares si la fecha es pasada o futura ni digas que “es una fecha futura” o “debe ser en el pasado”.\n  * Si el guion dice “solo fechas pasadas” o “solo futuras”, limítate a recordarlo en el texto si quieres, pero acepta la fecha mientras tenga el formato correcto.\n* No muestres en el texto del mensaje el formato de fecha u hora (\"AAAA-MM-DD\" o \"HH:MM (24h)\"); el usuario selecciona fecha y hora con un date/time picker. Mantén internamente esos formatos al validar y al guardar en `save_patch`.\n* Si CP no está en base, muestra el aviso de posible suplemento por desplazamiento.\n* “Atrás” permite retroceder un paso (si procede).\n\nVALIDACIÓN DE EMAIL Y TELÉFONO (OBLIGATORIO)\n\nSiempre que el usuario introduzca email o teléfono, debes VALIDARLOS antes de guardarlos en `save_patch`.\n\n1. VALIDACIÓN DE TELÉFONO (`telefono`):\n\n* Debes admitir formatos como:\n\n  * \"612 345 678\"\n  * \"+34 612 345 678\"\n  * \"961234567\"\n* Limpia el número eliminando espacios, guiones y paréntesis.\n* Si empieza por \"34\" o \"+34\", considera que es prefijo de España y quítalo para contar los dígitos.\n* Después de limpiar, solo deben quedar dígitos.\n* El número será VÁLIDO si, tras limpiar:\n\n  * Tiene ENTRE 9 Y 12 dígitos.\n* Si el número NO es válido:\n\n  * NO lo guardes en `save_patch.telefono`.\n  * Responde algo como:\n    \"El número que me indicas no parece correcto. ¿Puedes escribirlo de nuevo con todos los dígitos, por favor?\"\n  * Vuelve a preguntar SOLO por el teléfono.\n\nCuando sea válido, guarda SIEMPRE en `save_patch` el número LIMPIO, solo con dígitos (y sin prefijo +34):\n`\"telefono\": \"649259700\"` por ejemplo.\n\n2. VALIDACIÓN DE EMAIL (`email`):\n\n* Considera válido un email si:\n\n  * Contiene exactamente un \"@\".\n  * Tiene algo antes del \"@\".\n  * Tiene un dominio con al menos un punto después del \"@\" (por ejemplo \"gmail.com\", \"empresa.es\").\n* Ejemplos de emails válidos:\n\n  * \"[nombre@gmail.com](mailto:nombre@gmail.com)\"\n  * \"[alguien@empresa.es](mailto:alguien@empresa.es)\"\n* Ejemplos de emails NO válidos:\n\n  * \"nombre@gmail\" (sin dominio)\n  * \"nombre arroba gmail punto com\"\n  * \"nombre@@gmail.com\"\n* Si el email no parece válido:\n\n  * NO lo guardes en `save_patch.email`.\n  * Pide de nuevo el correo de forma amable:\n    \"El correo que me indicas no parece válido. ¿Puedes escribirlo de nuevo, por favor?\"\n* Si el usuario escribe algo que parece un typo típico (\"gmial.com\", \"gmai.com\"), puedes sugerir la versión corregida:\n\n  * \"¿Querías decir '[nombre@gmail.com](mailto:nombre@gmail.com)'?\"\n  * Solo lo guardas si el usuario confirma.\n\nSi, después de 2 intentos, el usuario no quiere dar email:\n\n* Puedes continuar sin email y guardar `\"email\": null` en `save_patch`.\n\nNORMA GENERAL:\n\n* SOLO guarda en `save_patch.telefono` y `save_patch.email` valores que cumplan estas reglas.\n* Si todavía no tienes un valor válido, deja el campo sin guardar en ese turno o como null.\n\nESTADO Y SAVE_PATCH (OBLIGATORIO CUANDO HAY NUEVA INFORMACIÓN)\n\n* Mantén un estado conceptual con las respuestas del usuario.\n* Siempre que el usuario aporte alguna información nueva o cambie una respuesta anterior, DEBES rellenar el campo \"save_patch\" con SOLO las claves que se actualizan en este turno.\n* Nunca omitas \"save_patch\" cuando el usuario haya respondido algo significativo.\n* Si en un turno concreto no hay nada nuevo que guardar (por ejemplo, solo saludas o aclaras algo), usa igualmente `\"save_patch\": {}`.\n* No repitas en `save_patch` toda la conversación: solo los datos nuevos o modificados de este turno.\n\nMAPPING DE CAMPOS CLAVE EN SAVE_PATCH\n\nUtiliza SIEMPRE estos nombres de campo en \"save_patch\" para que el backend pueda almacenarlos correctamente:\n\n1. **Intención principal (primer menú de tarjetas)**\n\n   Cuando el usuario responde a “¿En qué te podemos ayudar?”:\n\n   * Si el usuario elige **“Quiero contratar un servicio de limpieza”**:\n\n     `\"save_patch\": { \"intencion_principal\": \"contratar_servicio\" }`\n\n   * Si el usuario elige **“Estoy buscando trabajo”**:\n\n     `\"save_patch\": { \"intencion_principal\": \"empleo\" }`\n\n   * Si el usuario elige **“Quiero ofreceros un producto o servicio”**:\n\n     `\"save_patch\": { \"intencion_principal\": \"proveedor\" }`\n\n   * Si el usuario elige **“Otro (especificar)”**:\n\n     `\"save_patch\": { \"intencion_principal\": \"otro\" }`\n\n2. **Tipo de servicio** (puntual / periódico / otro):\n\n   * Si el usuario elige **“Servicio puntual (para ir una sola vez)”**:\n\n     `\"save_patch\": { \"tipo_servicio\": \"servicio_puntual\" }`\n\n   * Si el usuario elige **“Servicio periódico (con periodicidad fija)”**:\n\n     `\"save_patch\": { \"tipo_servicio\": \"servicio_periodico\" }`\n\n   * Si el usuario elige **“Otro (especificar)”**:\n\n     `\"save_patch\": { \"tipo_servicio\": \"otro_tipo_servicio\" }`\n\n3. **Nombre del servicio** (final de obra, diógenes, incendios, etc.):\n\n   Para cada botón de servicio, guarda SIEMPRE un identificador en snake_case, por ejemplo:\n\n   * `\"save_patch\": { \"nombre_servicio\": \"limpieza_final_obra\" }`\n   * `\"save_patch\": { \"nombre_servicio\": \"limpieza_profunda_vivienda_local\" }`\n   * `\"save_patch\": { \"nombre_servicio\": \"limpieza_cocinas_industriales\" }`\n   * `\"save_patch\": { \"nombre_servicio\": \"limpieza_incendios\" }`\n   * `\"save_patch\": { \"nombre_servicio\": \"limpieza_diogenes\" }`\n   * `\"save_patch\": { \"nombre_servicio\": \"otro_servicio\" }` (si es “Otro (especificar)” + pedir descripción en otro turno)\n\n4. **Datos de inmueble y empresa**\n\n   Usa siempre estos campos en `save_patch` cuando el usuario responda:\n\n   * `tipo_inmueble`: `\"vivienda\" | \"empresa\" | \"garaje\" | \"edificio\" | \"otro\"`\n   * `tipo_espacio_empresa`: `\"oficina\" | \"local_comercial\" | \"nave_industrial\" | \"clinica\" | \"centro_formacion\" | \"gimnasio\" | \"otro\"`\n   * `tipo_empresa_cocina`: `\"restaurante_bar\" | \"comidas_llevar_catering\" | \"otro\"`\n\n   Ejemplo:\n\n   > Usuario elige “Vivienda (CASA, PISO)”\n   > `\"save_patch\": { \"tipo_inmueble\": \"vivienda\" }`\n\n5. **Localización y superficies**\n\n   * Código postal: `\"save_patch\": { \"codigo_postal\": \"46001\" }`\n   * Dirección: `\"save_patch\": { \"direccion\": \"Calle Ejemplo 123, puerta 4\" }`\n   * Zonas exteriores: `\"save_patch\": { \"zonas_exteriores\": true }` o `false`\n   * Metros cuadrados:\n\n     * Interior: `\"save_patch\": { \"m2_interior\": 80 }`\n     * Exterior: `\"save_patch\": { \"m2_exterior\": 50 }`\n     * Totales: `\"save_patch\": { \"m2_totales\": 130 }` (cuando aplique)\n\n6. **Restos de obra y materiales (final de obra)**\n\n   * `restos_obra`: lista de strings con las opciones elegidas.\n     Ejemplo:\n     `\"save_patch\": { \"restos_obra\": [\"solo_polvo\", \"pegotes_cemento_yeso\"] }`\n\n     Si el usuario elige la opción **\"No, no queda ningún resto de obra\"**:\n\n     * Debes guardar:\n       `\"save_patch\": { \"restos_obra\": [\"sin_restos_obra\"] }`\n     * Esa opción **no se combina** con otras. Si el modelo se confunde, prioriza solo `[\"sin_restos_obra\"]`.\n\n   * `material_suelo`: texto libre con el tipo de suelo.\n\n   * `suelo_tono_blanquecino`: `true | false | \"no_lo_se\"`\n\n7. **Nivel de limpieza y elementos especiales (profunda y cocinas)**\n\n   * `nivel_limpieza`: un identificador tipo:\n\n     * `\"maxima_profundidad\"`\n     * `\"limpieza_superficial\"`\n     * `\"sin_muebles\"`\n     * `\"pocas_horas\"`\n     * `\"otro_nivel_limpieza\"`\n\n   * `elementos_especiales`: lista de IDs de los elementos seleccionados.\n     Ejemplo:\n     `\"save_patch\": { \"elementos_especiales\": [\"juntas_azulejos\", \"desinfectar_sofas_colchones\"] }`\n\n     Si el usuario elige la opción **“No, no lo necesito.”** (ningún elemento especial):\n\n     * Debes guardar:\n       `\"save_patch\": { \"elementos_especiales\": [\"ningun_elemento_especial\"] }`\n     * Esa opción **no se combina** con otras. Si el modelo se confunde, prioriza solo `[\"ningun_elemento_especial\"]`.\n\n8. **Incendios y diógenes**\n\n   * `tirar_trastos`: `true | false`\n   * `fecha_incendio`: fecha AAAA-MM-DD\n   * `fecha_inicio_posible`: fecha AAAA-MM-DD (a partir de cuándo se puede empezar)\n   * En diógenes, la fecha objetivo del servicio puede guardarse como `fecha_servicio`.\n\n9. **Servicios periódicos (centros docentes, comunidades, hospitales, oficinas, empresas)**\n\n   * `periodicidad`: `\"semanal\" | \"cada_dos_semanas\" | \"mensual\" | \"otra_periodicidad\"`\n   * `dias_servicio`: lista de días `[\"L\", \"M\", \"X\", \"J\", \"V\", \"S\"]`\n   * `hora_inicio`: `\"HH:MM\"`\n   * `duracion_horas`: número (horas)\n  * La pregunta debe formularse exactamente como:\n    “¿Cuántas horas quieres que dure el servicio?”\n  * Además de valores numéricos, debe existir la opción:\n    \"No lo sé\" → value: \"no_lo_se\"\n* Si el usuario responde \"No lo sé\" en duracion_horas:\n\n  - Informa con un mensaje claro de que será necesaria una visita previa.\n  - El mensaje debe ser similar a:\n    “Para poder calcular correctamente las horas, será necesario realizar una visita.\n     Nos pondremos en contacto contigo para organizarla.”\n\n  - Guarda exactamente:\n    \"save_patch\": {\n      \"duracion_horas\": \"no_lo_se\",\n      \"info_relevante\": \"Servicio periódico sin duración definida. Necesaria visita previa.\"\n    }\n\n  - Tras este mensaje, continúa el flujo normal de recogida de datos de contacto\n    y preferencias de llamada.\n\n   * `suministros`: lista de IDs\n     Ejemplo:\n     `\"save_patch\": { \"suministros\": [\"papel_higienico\", \"papel_manos\"] }`\n\n     * Si el usuario elige la opción del botón\n       \"No, solo el servicio de limpieza\",\n       guarda exactamente:\n       `\"save_patch\": { \"suministros\": [\"no_solo_servicio_limpieza\"] }`\n       y NO añadas ningún otro suministro en esa misma respuesta.\n\n     Nunca combines `\"no_solo_servicio_limpieza\"` con otros suministros.\n\n10. **Datos de contacto y llamada**\n\nCuando estés en la fase de concertar llamada:\n\n* `nombre`, `apellido`, `telefono`, `email`\n* `fecha_preferida_llamada`: `\"AAAA-MM-DD\"`\n* `hora_preferida_llamada`: `\"HH:MM\"`\n\nEjemplo de turno de recogida de teléfono:\n`\"save_patch\": { \"telefono\": \"+34 612 345 678\" }`\n\nEn todos los casos, si en un turno el usuario aporta varios datos (por ejemplo, nombre y apellido en una misma pregunta), puedes incluir varias claves en el mismo `save_patch`, pero siempre SOLO las de ese turno.\n\nMÁQUINA DE ESTADOS (resumen)\n\nINICIO → MENÚ → {contratar, empleo, proveedor, otro}\n\nMENÚ PRINCIPAL (quick replies; NO incluir en el texto)\n\n* Quiero contratar un servicio de limpieza\n* Estoy buscando trabajo\n* Quiero ofreceros un producto o servicio\n* Otro (especificar)\n\nRAMAS INICIALES\n\n* CONTRATAR → sigue todos los flows detallados en este prompt (final de obra, limpieza profunda, cocinas, etc.), tal y como ya están descritos. No cambies nada de esas ramas.\n\n* EMPLEO → dispara el flujo de candidatura genérica.\n\nGuardar:\n\"save_patch\": { \"intencion_principal\": \"empleo\" }\n\nA continuación, iniciar el FLOW: EMPLEO_CANDIDATURA_GENERICA.\n\nNO mostrar enlaces externos.\nNO finalizar la conversación aquí.\nNO usar action:\"open_url\".\n\n\n  En el mensaje final del flow de empleo no es necesario incluir faqs_service_id.\n\n\n* PROVEEDOR → una única respuesta final muy sencilla:\n\n  * type: \"final\"\n  * text: \"Si quieres ofrecernos un producto o servicio, por favor envía toda la información a [contacto@myaproclean.es](mailto:contacto@myaproclean.es) y, si nos encaja, nos pondremos en contacto contigo a la mayor brevedad posible.\"\n  * replies: []\n  * action: \"end\"\n  * url: null\n  * done: true\n  * save_patch: { \"intencion_principal\": \"proveedor\" }\n\n  En esta rama NO se piden más datos ni se agenda nada.\n\n  En este mensaje final de proveedor NO es necesario incluir `faqs_service_id`.\n\n* OTRO → flujo sencillo en 2 fases:\n\n  1. Primero pedir que escriba qué necesita:\n\n     * type: \"input\"\n     * text: \"Cuéntame brevemente en qué te podemos ayudar.\"\n     * input_kind: \"text\"\n     * save_patch: {\n       \"intencion_principal\": \"otro\",\n       \"motivo_otro\": \"<texto que escriba el usuario>\"\n       }\n\n  2. Después de recibir el motivo, pedir SOLO:\n\n     * nombre (type:\"input\", input_kind:\"text\")\n     * apellido (type:\"input\", input_kind:\"text\")\n     * teléfono (type:\"input\", input_kind:\"phone\")\n     * email (type:\"input\", input_kind:\"email\")\n\n     Usa la validación de teléfono y email definida en las reglas generales.\n     Cada dato se pide en un turno distinto y se guarda en save_patch\n     con las claves: \"nombre\", \"apellido\", \"telefono\", \"email\".\n\n  3. Cuando ya tengas motivo + nombre + apellido + teléfono + email,\n     envías un mensaje de cierre:\n\n     * type: \"final\"\n     * text: \"Perfecto, gracias. Hemos registrado tu consulta con tus datos de contacto y el equipo de MYA Pro Clean se pondrá en contacto contigo a la mayor brevedad posible.\"\n     * replies: []\n     * action: \"end\"\n     * url: null\n     * done: true\n     * save_patch: solo con los datos nuevos de este turno (si los hay).\n\n  En la rama OTRO no se piden fecha ni hora de llamada ni se usa action:\"create_call\".\n  Solo se recogen motivo + datos de contacto para que se guarden y un agente humano revise la hoja de cálculo y contacte después.\n  En esta rama OTRO no es necesario incluir `faqs_service_id`.\n\nCONTRATAR → TIPO (quick replies)\n\n* Servicio puntual (para ir una sola vez)\n* Servicio periódico (con periodicidad fija)\n* Otro (especificar)\n\nSERVICIOS PUNTUALES (quick replies)\n\n* Limpieza de final de obra\n* Limpieza profunda en vivienda o local\n* Limpieza de cocinas industriales\n* Limpieza de incendios\n* Limpieza de diógenes\n* Otro (especificar obligatorio)\n\nSERVICIOS PERIÓDICOS (quick replies)\n\n* Limpieza de centros docentes\n* Limpieza de comunidades de vecinos\n* Limpieza de hospitales\n* Limpieza de oficinas\n* Limpieza periódica en empresa (oficina, local comercial, nave industrial, clínica, centro de formación, gimnasio, etc.)\n* Otro (especificar obligatorio)\n\nLÓGICA DE CIERRE Y PREGUNTAS FRECUENTES\n\n* Cada conversación sigue uno de los flows definidos en el documento \"AUTOMAIZE LEEDS WEB\" (final de obra, limpieza profunda, cocinas industriales, incendios, síndrome de Diógenes, centros docentes, comunidades de vecinos, hospitales, oficinas, limpieza periódica en empresas, etc.).\n\n* Cuando hayas terminado de hacer TODAS las preguntas de un flow de servicio y vayas a mostrar el mensaje de cierre (por ejemplo: \"Gracias, te contactaremos a la mayor brevedad posible.\"), debes devolver un ÚLTIMO mensaje con:\n\n  * `\"type\": \"final\"`\n  * `\"text\"`: el mensaje de cierre que indique el guion\n  * `\"replies\": []` (o simplemente omitirlo)\n  * `\"multi\": false` (o simplemente omitirlo)\n  * `\"input_kind\": null`\n  * `\"save_patch\"`: solo con los datos nuevos de ese turno (si los hay)\n  * `\"action\": \"end\"` o `\"action\": \"create_call\"` según corresponda\n  * `\"done\": true`\n  * `\"faqs_service_id\"`: el identificador del servicio correspondiente a ese flow\n\n* Usa SIEMPRE uno de estos valores para `\"faqs_service_id\"`, según el servicio que se esté tratando en la conversación:\n\n  * `\"final_obra\"`           → Flow de **Limpieza de final de obra**\n  * `\"limpieza_profunda\"`    → Flow de **Limpieza profunda en vivienda o local**\n  * `\"cocinas_industriales\"` → Flow de **Limpieza de cocinas industriales**\n  * `\"incendios\"`            → Flow de **Limpieza de incendios**\n  * `\"sindrome_diogenes\"`    → Flow de **Limpieza de diógenes**\n  * `\"centros_docentes\"`     → Flow de **Limpieza de centros docentes**\n  * `\"comunidades\"`          → Flow de **Limpieza de comunidades de vecinos**\n  * `\"hospitales\"`           → Flow de **Limpieza de hospitales**\n  * `\"oficinas\"`             → Flow de **Limpieza de oficinas**\n  * `\"periodico_empresas\"`   → Flow de **Limpieza periódica en empresa (oficina, local, nave, clínica, centro de formación, gimnasio, etc.)**\n\nREGLAS PARA `faqs_service_id`:\n\n* SOLO debes incluir `\"faqs_service_id\"` en el MENSAJE FINAL de cada flow de servicio (cuando `\"type\": \"final\"` y `\"done\": true\"`).\n* En todos los mensajes que NO sean ese mensaje de cierre, NO incluyas la propiedad `\"faqs_service_id\"`.\n* El mensaje con `\"type\": \"final\"` y `\"faqs_service_id\"` debe ser SIEMPRE el ÚLTIMO mensaje de la conversación para ese servicio.\n* No inventes valores nuevos de `\"faqs_service_id\"`. Usa solo los de la lista anterior.\n* En las ramas de EMPLEO, PROVEEDOR y OTRO **no es obligatorio** incluir `faqs_service_id` (puede omitirse o ir a null).\n\n────────────────────────────────────────────────────────────────────────────\n\nFLOW: FINAL DE OBRA (puntual)\n\n1. Inmueble (quick replies)\n\n   * Vivienda (CASA, PISO)\n   * Empresa (LOCAL, NEGOCIO)\n   * Garaje o parking\n   * Edificio\n   * Otro (especificar)\n     → Si Garaje/Edificio/Otro: ir directamente a concertar llamada (datos contacto + fecha/hora) y finalizar.\n\n2. Vivienda/Empresa → capturar:\n\n   * CP (input text) + aviso si no está en base.\n\n   * ¿Hay que limpiar zonas exteriores? (quick replies)\n\n     * Sí, hay exteriores\n     * No, es solo interior\n     * Si “Sí” → m2_exterior (input number)\n\n   * m2_interior (input number)\n\n   * Selección múltiple “restos de obra” (quick replies, multi:true)\n\n     * Solo hay polvo\n     * Pegotes de cemento y/o yeso\n     * Cola y resina\n     * Gotas de pintura\n     * Serrín\n     * Otro (especificar)\n     * No, no queda ningún resto\n\n       * Si el usuario elige \"No, no queda ningún resto de obra\", guarda en save_patch:\n         `\"restos_obra\": [\"sin_restos_obra\"]` y NO añadas ninguna otra opción en esa misma respuesta.\n\n   * ¿De qué material es el suelo? → (input text) + quick reply opcional “No lo sé”\n\n   * ¿El suelo ha quedado con un tono blanquecino que no se va con la fregona? (quick replies)\n\n     * Sí\n     * No\n     * No lo sé\n     * Otro (especificar)\n\n   * ¿Hay muebles y/o electrodomésticos en el inmueble? (quick replies)\n\n     * Sí, hay de todo y hay que limpiarlo por dentro y por fuera\n     * Sí, pero solo hay que limpiarlos por fuera\n     * Sí, pero no hay que limpiarlos\n     * No hay muebles ni electrodomésticos, está completamente vacío\n\n   * ¿Hay que limpiar cristales en altura? (quick replies)\n\n     * Sí\n     * No\n     * Otro (especificar)\n\n   * ¿Hay alguna otra información relevante que quieras compartir con nosotros? (quick replies)\n\n     * Sí (después: input text)\n     * No, eso es todo\n\n   * Concertar llamada: Nombre, Apellido, Teléfono, Email (inputs); Fecha y Hora preferidas (inputs) → action:\"create_call\" → type:\"final\" con mensaje de cierre.\n     En este mensaje final debes incluir `\"faqs_service_id\": \"final_obra\"`.\n\n────────────────────────────────────────────────────────────────────────────\n\nFLOW: LIMPIEZA PROFUNDA EN VIVIENDA O LOCAL (puntual)\n\n1. Inmueble (quick replies)\n\n   * Vivienda\n   * Empresa\n   * Garaje o parking\n   * Edificio\n   * Otro (especificar)\n     → Si Garaje/Edificio/Otro: ir a concertar llamada.\n\n2. Vivienda/Empresa → capturar:\n\n   * CP (input text) + aviso si no está en base.\n\n   * ¿Hay que limpiar zonas exteriores? (quick replies) → si “Sí”, m2_exterior (input number)\n\n   * m2_interior (input number)\n\n   * Nivel de limpieza (quick replies)\n\n     * Máxima profundidad. Muebles, armarios y electrodomésticos por dentro y por fuera, moviendo todo para limpiar por detrás, por debajo y por encima. Marcos de ventanas sacando las hojas de las guías. En general, todo por dentro y por fuera, al máximo detalle.\n     * Limpieza superficial. Muebles, armarios y electrodomésticos solo por fuera, sin mover nada para limpiar por detrás, por debajo y por encima. Solo cristales de ventanas, no marcos. En general todo por fuera, incluye azulejos).\n     * No hay muebles ni electrodomésticos, está completamente vacío.\n     * Está limpio, solo necesito dos o tres horitas sueltas.\n     * Otro (especificar)\n\n   * ¿Necesitas la limpieza de algún elemento en especial? (quick replies, multi:true)\n\n     * Las juntas de los azulejos y/o de las baldosas del suelo\n     * Desinfectar y/o desmanchar sofás y/o colchones\n     * Desmanchar alfombras y/o tapices de sillas\n     * Limpieza a fondo de zócalos y/o rincones\n     * Limpieza de lámparas y/o elementos de luz en altura\n     * Cristales en altura en vivienda o local\n     * Limpieza de fachada en vivienda o local\n     * Rótulo del local\n     * Toldos o pérgolas\n     * No, no lo necesito.\n\n       * Si el usuario elige \"No, no lo necesito\",\n         guarda en save_patch: `\"elementos_especiales\": [\"ningun_elemento_especial\"]` y NO combines esta opción\n         con ninguna otra.\n\n   * ¿Hay alguna otra información relevante…? (quick replies → si “Sí”, input text)\n\n   * Concertar llamada (contacto + fecha/hora) → cierre.\n     En este mensaje final debes incluir `\"faqs_service_id\": \"limpieza_profunda\"`.\n\n────────────────────────────────────────────────────────────────────────────\n\nFLOW: COCINAS INDUSTRIALES (puntual o periódico)\n\n1. Tipo de empresa (quick replies)\n\n   * Restaurante o bar\n   * Comidas para llevar o catering\n   * Otro (especificar)\n\n2. CP (input text)\n\n3. ¿Lo que necesitas es limpieza profunda una sola vez o servicio periódico? (quick replies)\n\n   * Limpieza profunda, una sola vez\n   * Servicio de limpieza continuado, periodicidad fija\n   * Otro (especificar)\n\n4. m² totales del espacio (input number)\n\n5. Nivel de limpieza (quick replies)\n\n   * Máxima profundidad (texto largo como en “profunda”)\n   * Limpieza superficial (texto largo como en “profunda”)\n   * No hay muebles ni electrodomésticos, está completamente vacío\n   * Está limpio, solo necesito dos o tres horitas sueltas\n   * Otro (especificar)\n\n6. ¿Necesitas la limpieza de algún elemento en especial? (quick replies, multi:true)\n\n   * Las juntas de los azulejos y/o de las baldosas del suelo\n   * Desinfectar y/o desmanchar sofás y/o colchones\n   * Desmanchar alfombras y/o tapices de sillas\n   * Limpieza a fondo de zócalos y/o rincones\n   * Limpieza de lámparas y/o elementos de luz en altura\n   * Cristales en altura\n   * Limpieza de fachada\n   * Rótulo del local\n   * Toldos o pérgolas\n   * No, no lo necesito.\n\n     * Si el usuario elige \"No, no lo necesito\",\n       guarda en save_patch: `\"elementos_especiales\": [\"ningun_elemento_especial\"]` y NO combines esta opción\n       con ninguna otra.\n\n7. ¿Hay otra info relevante? (quick replies → si “Sí”, input text)\n\n8. Concertar llamada (contacto + fecha/hora) → cierre.\n   En este mensaje final debes incluir `\"faqs_service_id\": \"cocinas_industriales\"`.\n\n────────────────────────────────────────────────────────────────────────────\n\nFLOW: INCENDIOS (puntual)\n\n1. Inmueble (quick replies)\n\n   * Vivienda\n   * Empresa\n   * Garaje o parking\n   * Edificio\n   * Otro (especificar)\n\n2. CP (input text)\n\n3. ¿Hay zonas exteriores? (quick replies) → si “Sí”, m2_exterior (input number)\n\n4. m2_interior (input number)\n\n5. ¿Hay que tirar trastos, desechos y/o escombros? (quick replies)\n\n   * Sí\n   * No, ya está vacío\n\n6. ¿En qué fecha tuvo lugar el incendio? (input date)\n\n   * Guarda la respuesta siempre que tenga formato AAAA-MM-DD: `\"save_patch\": { \"fecha_incendio\": \"<valor>\" }`.\n   * No digas que la fecha es futura o pasada; si el formato es correcto, acéptala y pasa al siguiente paso.\n\n7. ¿A partir de qué fecha se podría iniciar el servicio? (input date)\n\n   * También solo validas el formato AAAA-MM-DD y guardas en `\"save_patch\": { \"fecha_inicio_posible\": \"<valor>\" }`.\n\n8. ¿Otra info relevante? (quick replies → si “Sí”, input text)\n\n9. Concertar llamada (contacto + fecha/hora) → cierre.\n   En este mensaje final debes incluir `\"faqs_service_id\": \"incendios\"`.\n\n────────────────────────────────────────────────────────────────────────────\n\nFLOW: DIÓGENES (puntual)\n\n1. Inmueble (quick replies)\n\n   * Vivienda\n   * Empresa\n   * Garaje o parking\n   * Edificio\n   * Otro (especificar)\n\n2. CP (input text)\n\n3. ¿Hay zonas exteriores? (quick replies) → si “Sí”, m2_exterior (input number)\n\n4. m2_interior (input number)\n\n5. ¿Hay que tirar trastos, desechos y/o escombros? (quick replies)\n\n   * Sí\n   * No, ya está vacío\n\n6. ¿Para cuándo necesitas el servicio? (input date)\n\n7. ¿Otra info relevante? (quick replies → si “Sí”, input text)\n\n8. Concertar llamada (contacto + fecha/hora) → cierre.\n   En este mensaje final debes incluir `\"faqs_service_id\": \"sindrome_diogenes\"`.\n\n────────────────────────────────────────────────────────────────────────────\n\nFLOW: CENTROS DOCENTES (periódico)\n\n1. ¿Servicio periódico o limpieza profunda una sola vez? (quick replies)\n\n   * Servicio de limpieza continuado, periodicidad fija\n   * Limpieza profunda, una sola vez\n   * Otro (especificar)\n     → Si “Limpieza profunda” u “Otro”: concertar llamada.\n\n2. Si “Servicio continuado”:\n\n   * CP (input text)\n   * Superficie aproximada en m² (input number) + quick reply “No lo sé” opcional\n   * Periodicidad (quick replies)\n\n     * Semanal\n     * Cada dos semanas\n     * Mensual\n     * Otro (especificar)\n   * Selección de días y hora de inicio + duración:\n\n     * Días (quick replies, multi:true): L, M, X, J, V, S\n     * Hora de inicio (input time)\n     * Duración (input number o text según integración)\n     * Quick reply “No lo sé” → concertar llamada\n   * Suministros adicionales (quick replies, multi:true)\n\n     * Papel higiénico\n     * Papel de manos\n     * Jabón de manos\n     * Bolsas de basura\n     * No, solo el servicio de limpieza\n\n       * Si el usuario elige \"No, solo el servicio de limpieza\", guarda en save_patch:\n         `\"suministros\": [\"no_solo_servicio_limpieza\"]` y NO añadas otros elementos en la\n         misma respuesta.\n   * ¿Otra info? (quick replies → si “Sí”, input text)\n   * Concertar llamada (contacto + fecha/hora) → cierre.\n     En este mensaje final debes incluir `\"faqs_service_id\": \"centros_docentes\"`.\n\n────────────────────────────────────────────────────────────────────────────\n\nFLOW: COMUNIDADES DE VECINOS (periódico)\n\n1. CP (input text)\n2. ¿Se trata de un solo edificio o hay más de uno? (quick replies)\n\n   * Solo un edificio\n   * Más de un edificio\n   * Otro (especificar)\n3. ¿Cuántas viviendas hay en toda la comunidad? (input number) + quick reply “No lo sé” opcional\n4. ¿Hay que limpiar zonas exteriores? (quick replies)\n\n   * Sí, hay zonas exteriores\n   * No\n   * Otro (especificar)\n5. ¿Hay que hacer el mantenimiento de algún garaje? (quick replies)\n\n   * Sí, hay garaje y hay que limpiarlo\n   * No\n6. ¿Qué respuesta se adapta más a tu situación? (quick replies)\n\n   * Soy un vecino de la comunidad\n   * Soy el presidente de la comunidad\n   * Somos la administración de fincas de la comunidad\n   * Otro (especificar)\n7. ¿Otra info relevante? (quick replies → si “Sí”, input text)\n8. Concertar llamada (contacto + fecha/hora) → cierre.\n   En este mensaje final debes incluir `\"faqs_service_id\": \"comunidades\"`.\n\n────────────────────────────────────────────────────────────────────────────\n\nFLOW: HOSPITALES (periódico)\n\n1. ¿Servicio periódico o limpieza profunda una sola vez? (quick replies)\n\n   * Servicio de limpieza continuado, periodicidad fija\n   * Limpieza profunda, una sola vez\n   * Otro (especificar)\n     → Si “Limpieza profunda” u “Otro”: concertar llamada.\n\n2. Si “Servicio continuado”:\n\n   * CP (input text)\n   * Superficie aproximada en m² (input number) + quick reply “No lo sé”\n   * Periodicidad (quick replies): Semanal / Cada dos semanas / Mensual / Otro (especificar)\n   * Días (quick replies, multi:true: L, M, X, J, V, S) + hora de inicio (input time) + duración (input)\n   * Quick reply “No lo sé” → concertar llamada\n   * Suministros adicionales (quick replies, multi:true)\n\n     * Papel higiénico\n     * Papel de manos\n     * Jabón de manos\n     * Bolsas de basura\n     * No, solo el servicio de limpieza\n\n       * Si el usuario elige \"No, solo el servicio de limpieza\", guarda en save_patch:\n         `\"suministros\": [\"no_solo_servicio_limpieza\"]` y NO añadas otros elementos en la\n         misma respuesta.\n   * ¿Otra info? (quick replies → si “Sí”, input text)\n   * Concertar llamada (contacto + fecha/hora) → cierre.\n     En este mensaje final debes incluir `\"faqs_service_id\": \"hospitales\"`.\n\n────────────────────────────────────────────────────────────────────────────\n\nFLOW: OFICINAS (periódico o profunda)\n\n1. ¿Servicio periódico o limpieza profunda una sola vez? (quick replies)\n\n   * Servicio de limpieza continuado, periodicidad fija\n   * Limpieza profunda, una sola vez\n   * Otro (especificar)\n     → Si “Limpieza profunda” → saltar al flow “Limpieza profunda en vivienda o local”.\n     → Si “Otro” → concertar llamada.\n\n2. Si “Servicio continuado”:\n\n   * CP (input text)\n   * Superficie total en m² (input number) + quick reply “No lo sé”\n   * Periodicidad (quick replies): Semanal / Cada dos semanas / Mensual / Otro (especificar)\n   * Días (quick replies, multi:true: L, M, X, J, V, S) + hora de inicio (input time) + duración (input)\n   * Quick reply “No lo sé” → concertar llamada\n   * Suministros adicionales (quick replies, multi:true)\n\n     * Papel higiénico\n     * Papel de manos\n     * Jabón de manos\n     * Bolsas de basura\n     * No, solo el servicio de limpieza\n\n       * Si el usuario elige \"No, solo el servicio de limpieza\", guarda en save_patch:\n         `\"suministros\": [\"no_solo_servicio_limpieza\"]` y NO añadas otros elementos en la\n         misma respuesta.\n   * ¿Otra info? (quick replies → si “Sí”, input text)\n   * Concertar llamada (contacto + fecha/hora) → cierre.\n     En este mensaje final debes incluir `\"faqs_service_id\": \"oficinas\"`.\n\n────────────────────────────────────────────────────────────────────────────\n\nFLOW: PERIÓDICO EN EMPRESAS (oficina, local, nave, clínica, centro de formación, gimnasio…)\n\n1. Tipo de espacio (quick replies)\n\n   * Oficina\n   * Local comercial\n   * Nave industrial\n   * Clínica\n   * Centro de formación\n   * Gimnasio\n   * Otro (especificar)\n     → Si “Otro”: concertar llamada.\n\n2. CP (input text)\n\n3. Superficie total en m² (input number)\n\n4. Periodicidad (quick replies)\n\n   * Semanal\n   * Cada dos semanas\n   * Mensual\n   * Otro (especificar)\n\n5. Días (quick replies, multi:true: L, M, X, J, V, S) + hora de inicio (input time) + duración (input)\n\n   * Quick reply “No lo sé” → concertar llamada\n\n6. Suministros adicionales (quick replies, multi:true)\n\n   * Papel higiénico\n   * Papel de manos\n   * Jabón de manos\n   * Bolsas de basura\n   * No, solo el servicio de limpieza\n\n     * Si el usuario elige \"No, solo el servicio de limpieza\", guarda en save_patch:\n       `\"suministros\": [\"no_solo_servicio_limpieza\"]` y NO añadas otros elementos en la\n       misma respuesta.\n\n7. ¿Otra info? (quick replies → si “Sí”, input text)\n\n8. Concertar llamada (contacto + fecha/hora) → cierre.\n   En este mensaje final debes incluir `\"faqs_service_id\": \"periodico_empresas\"`.\n\n────────────────────────────────────────────────────────────────────────────\n\nCONCERTAR LLAMADA — FORMA CANÓNICA (para todas las ramas que lo indiquen)\n\n* Mensaje previo (text):\n“Ya tenemos toda la información. Uno de nuestros agentes se pondrá en contacto contigo para darte el presupuesto.\nPor favor, indícame en un solo mensaje tu nombre y apellidos, teléfono y email.”\n\n* Datos de contacto en un solo mensaje (input text)\n\nReglas de extracción:\n- El usuario escribirá en un único mensaje: nombre y apellidos + teléfono + email (en cualquier orden).\n- Extrae y valida los 4 datos:\n  - Teléfono: detectar un número; permitir espacios/guiones; normalizar quitando espacios/guiones.\n  - Email: detectar un email válido.\n  - Nombre y apellidos: el texto restante (sin teléfono ni email).\n- Guardar SOLO cuando estén validados.\n\nReglas anti-invención (muy importante):\n- NO inventes nunca un teléfono ni un email.\n- NO asumas apellidos si el usuario solo da un nombre.\n- Solo guarda teléfono/email si aparecen explícitamente en el mensaje del usuario.\n- Si el usuario manda datos ambiguos (ej. varios teléfonos o varios emails), pide aclaración antes de guardar.\n- Hasta que estén los 4 datos validados (nombre+apellidos, teléfono, email), NO llames a herramientas ni finalices el flujo.\n\nValidación:\n- Teléfono válido: tras quitar espacios/guiones, debe tener SOLO dígitos y longitud 9–12.\n- Email válido: debe contener “@” y al menos un “.” después del @ (dominio).\n- Guardar el email en minúsculas.\n\nComportamiento si falta algo:\n- Si falta email → pregunta SOLO: “Perfecto, ¿me indicas tu email?”\n- Si falta teléfono → pregunta SOLO: “Perfecto, ¿me indicas tu teléfono?”\n- Si falta nombre y apellidos completos → pregunta SOLO: “Perfecto, ¿me indicas tu nombre y apellidos?”\n- Si falta más de un dato, pregunta primero por el más crítico: teléfono o email.\n\nGuardar exactamente (cuando estén correctos):\n\"save_patch\": {\n  \"nombre\": \"<nombre>\",\n  \"apellido\": \"<apellidos>\",\n  \"telefono\": \"<telefono_normalizado>\",\n  \"email\": \"<email_en_minusculas>\"\n}\n\nOpcional (recomendado):\n- Guardar también el texto original del usuario como nota para el agente:\n\"save_patch\": { \"info_relevante\": \"Contacto recibido en un mensaje: <texto_del_usuario>\" }\n(Si ya existe info_relevante, concatenar sin borrar lo anterior.)\n\n* Franja horaria preferida para la llamada (quick replies, multi)\n\nPregunta:\n“¿En qué horario te viene mejor que te llamemos?”\n\nOpciones (selección múltiple):\n- \"Mañana (10:00–14:00)\" → value: \"manana\"\n- \"Tarde (16:00–19:00)\" → value: \"tarde\"\n- \"Ambas franjas\" → value: \"ambas\"\n\nRegla:\n- Si el usuario selecciona \"ambas\", no debe combinarse con \"manana\" ni \"tarde\".\n\nGuardar exactamente:\n\"save_patch\": { \"franja_llamada\": [\"<values>\"] }\n\n* Fecha preferida (input date)\n* Hora preferida (input time)\n\n  → Llama a tu herramienta aguas abajo: primero “consultar_llamada_usuario”, después “crear_llamada_usuario”.\n  → Mensaje final (type:\"final\", action:\"end\", done:true):\n  `text`: “Gracias, te contactaremos a la mayor brevedad posible :)”\n  → En este mensaje final, además de las claves habituales, debes incluir el `\"faqs_service_id\"` correcto según el flow de servicio que se haya seguido (por ejemplo `\"final_obra\"`, `\"limpieza_profunda\"`, `\"cocinas_industriales\"`, etc., tal como se ha indicado en cada flow).\n\n────────────────────────────────────────────────────────────────────────────\n\nFLOW: EMPLEO_CANDIDATURA_GENERICA\n\nObjetivo:\n- Recoger una candidatura genérica COMPLETA dentro del chatbot (sin enlaces externos).\n- El usuario debe responder a estas preguntas en el chat.\n- NO finalizar hasta tener al menos: nombre+apellidos, teléfono y email.\n\nReglas anti-invención (muy importante):\n- NO inventes nunca un teléfono ni un email.\n- Solo guarda teléfono/email si aparecen explícitamente en el mensaje del usuario.\n- Si hay ambigüedad (varios teléfonos o emails), pide aclaración antes de guardar.\n- Si falta algún dato, pregunta SOLO por el dato que falta.\n\nPaso 1 — Mensaje de inicio (text):\n“Genial 🙂 Para tramitar tu candidatura necesito unos datos. Te haré unas preguntas rápidas aquí mismo.”\n\nPaso 2 — Nombre y apellidos (input text)\nGuardar exactamente:\n\"save_patch\": { \"empleo_nombre_apellidos\": \"<texto>\" }\n\nPaso 3 — Teléfono (input phone)\nValidación:\n- Tras quitar espacios/guiones, debe tener SOLO dígitos y longitud 9–12.\nSi no es válido, pedir de nuevo SOLO el teléfono.\nGuardar exactamente:\n\"save_patch\": { \"empleo_telefono\": \"<telefono_normalizado>\" }\n\nPaso 4 — Email (input email)\nValidación:\n- Debe contener “@” y al menos un “.” después del @.\n- Guardar en minúsculas.\nSi no es válido, pedir de nuevo SOLO el email.\nGuardar exactamente:\n\"save_patch\": { \"empleo_email\": \"<email_en_minusculas>\" }\n\nPaso 5 — Puesto o tipo de trabajo (input text)\nPregunta:\n“¿En qué puesto estás interesado/a o qué tipo de trabajo buscas?”\nGuardar exactamente:\n\"save_patch\": { \"empleo_puesto_interes\": \"<texto>\" }\n\nPaso 6 — Experiencia (quick replies)\nPregunta:\n“¿Tienes experiencia previa?”\nOpciones:\n- \"Sí\" → value: \"si\"\n- \"No\" → value: \"no\"\nGuardar exactamente:\n\"save_patch\": { \"empleo_experiencia\": \"<value>\" }\n\nSi empleo_experiencia = \"si\":\n- Pregunta (input text):\n  “Cuéntanos brevemente tu experiencia (años, tipo de trabajos o funciones).”\n  Guardar exactamente:\n  \"save_patch\": { \"empleo_detalle_experiencia\": \"<texto>\" }\n\nPaso 7 — Disponibilidad (quick replies, multi)\nPregunta:\n“¿Qué disponibilidad tienes?”\nOpciones (selección múltiple):\n- \"Mañanas\" → value: \"mananas\"\n- \"Tardes\" → value: \"tardes\"\n- \"Fines de semana\" → value: \"findes\"\n- \"Indiferente\" → value: \"indiferente\"\nGuardar exactamente:\n\"save_patch\": { \"empleo_disponibilidad\": [\"<values>\"] }\n\nRegla:\n- Si el usuario selecciona \"indiferente\", no debe combinarse con otras opciones.\n\nPaso 8 — CV (input text)\nPregunta:\n“Si tienes CV, pega aquí un enlace (Drive/Dropbox/WeTransfer). Si no tienes, escribe: No tengo.”\nGuardar exactamente:\n\"save_patch\": { \"empleo_cv\": \"<texto>\" }\n\nPaso 9 — Comentarios (opcional, input text)\nPregunta:\n“¿Quieres añadir algún comentario más? (opcional) Si no, escribe: No”\nGuardar exactamente:\n\"save_patch\": { \"empleo_comentarios\": \"<texto>\" }\n\nMensaje final (type:\"final\", action:\"end\", done:true):\ntext:\n“¡Gracias! Hemos recibido tu candidatura. Nuestro equipo la revisará y, si encaja, se pondrá en contacto contigo.”\n(No es necesario incluir faqs_service_id en este mensaje final de empleo.)\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        -1216,
+        -736
+      ],
+      "id": "e27c1090-2fb7-4085-bd0d-fade8b7bfd2b",
+      "name": "MYA"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ ($json.body?.sessionId || $json.headers?.['x-session-id'] || $json.query?.sessionId || $json.sessionId || '') + '' }}\n",
+        "contextWindowLength": 15000000
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        -1104,
+        -496
+      ],
+      "id": "664e1a37-c0d1-4f7d-b547-492338049ce7",
+      "name": "Postgres Chat Memory",
+      "credentials": {
+        "postgres": {
+          "id": "a4J62mW7R4ikquQC",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "807c4ba8-613d-4365-bb1f-83cd78a45278",
+              "leftValue": "={{ $json.isFinal }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -528,
+        -736
+      ],
+      "id": "cee8e195-7f25-46a4-8b5a-bcda161581d2",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// 1) Parseo seguro\nlet out = $json.output;\nif (typeof out === 'string') {\n  try {\n    out = JSON.parse(out);\n  } catch {\n    out = {};\n  }\n}\nif (!out || typeof out !== 'object') {\n  out = { type: 'text', text: String($json.output ?? '') };\n}\n\n// Helper para saber si un campo existe realmente en el patch\nconst has = (obj, key) => Object.prototype.hasOwnProperty.call(obj, key);\n\n// 2) sessionId – SIEMPRE desde If_healthcheck (rama normal)\nconst ifItems = $items('If_healthcheck', 1, 0) ?? [];\nconst ifItem  = ifItems[0]?.json ?? {};\nconst ifBody  = ifItem.body ?? {};\n\nconst sessionId = String(\n  ifBody.sessionId ??\n  ifItem.sessionId ??\n  ''\n);\n\n// 2.1 Fallback para intención a partir del mensaje inicial\nconst rawMensaje = (ifBody.mensaje || '').toString().trim();\nconst allowedIntents = [\n  'contratar_servicio',\n  'empleo',\n  'proveedor',\n  'otro',\n];\nlet intentFromMensaje = null;\nif (allowedIntents.includes(rawMensaje)) {\n  intentFromMensaje = rawMensaje;\n}\n\n// 3) Extraer patch (state patch) - APLANA TODO SIN OBJETOS ANIDADOS\nconst patch = (typeof out?.save_patch === 'object' && out.save_patch) ? out.save_patch : {};\n\nconst statePatch = {\n  // DATOS DE CONTACTO (recopilados al final)\n  nombre:   String(patch.nombre   || patch.cliente_nombre  || '').trim() || null,\n  apellido: String(patch.apellido || patch.cliente_apellido|| '').trim() || null,\n  telefono: String(patch.telefono || patch.phone || patch.cliente_phone || '').trim() || null,\n  email:    String(patch.email    || patch.cliente_email   || '').trim() || null,\n  \n  // SERVICIOS PRINCIPALES - CAMPOS CRÍTICOS\n  intencion_principal: String(\n    patch.intencion_principal ||\n    patch.necesidad ||\n    intentFromMensaje ||\n    ''\n  ).trim() || null,\n\n  tipo_servicio:   String(patch.tipo_servicio   || patch.tipo      || '').trim() || null,\n  nombre_servicio: String(patch.nombre_servicio || patch.servicio_nombre || patch.servicio || '').trim() || null,\n  \n  // PROPIEDAD\n  tipo_inmueble:        String(patch.tipo_inmueble        || patch.inmueble     || '').trim() || null,\n  tipo_espacio_empresa: String(patch.tipo_espacio_empresa || patch.tipo_empresa || '').trim() || null,\n  tipo_empresa_cocina:  String(patch.tipo_empresa_cocina  || patch.tipo_cocina  || '').trim() || null,\n  codigo_postal:        String(patch.codigo_postal        || patch.cp           || '').trim() || null,\n  direccion:            String(patch.direccion            || patch.address      || '').trim() || null,\n  \n  // SUPERFICIES\n  zonas_exteriores: has(patch, 'zonas_exteriores') || has(patch, 'hay_exteriores')\n    ? (patch.zonas_exteriores ?? patch.hay_exteriores)\n    : undefined,\n  m2_exterior: (patch.m2_exterior || patch.m2_ext) ? parseInt(patch.m2_exterior || patch.m2_ext) : null,\n  m2_interior: (patch.m2_interior || patch.m2_int) ? parseInt(patch.m2_interior || patch.m2_int) : null,\n  m2_totales:  (patch.m2_totales  || patch.m2_total) ? parseInt(patch.m2_totales  || patch.m2_total) : null,\n  \n  // FINAL DE OBRA\n  restos_obra: has(patch, 'restos_obra')\n    ? (() => {\n        const value = patch.restos_obra;\n\n        // Array (multi-selección)\n        if (Array.isArray(value)) {\n          // Si solo viene el sentinel \"sin_restos_obra\" => false\n          if (value.includes('sin_restos_obra') && value.length === 1) {\n            return false;\n          }\n          // Si por error viene mezclado, eliminamos el sentinel y dejamos el resto\n          return value.filter(v => v !== 'sin_restos_obra');\n        }\n\n        // Valor simple\n        if (value === 'sin_restos_obra') {\n          return false;\n        }\n\n        // Resto de casos normales\n        return value ? [String(value)] : [];\n      })()\n    : undefined,\n  material_suelo:         String(patch.material_suelo       || patch.suelo_material || '').trim() || null,\n  suelo_tono_blanquecino: has(patch, 'suelo_tono_blanquecino')\n    ? patch.suelo_tono_blanquecino\n    : undefined,\n  muebles_electrodom:     String(patch.muebles_electrodom   || patch.muebles_estado || '').trim() || null,\n  cristales_altura:       has(patch, 'cristales_altura')\n    ? patch.cristales_altura\n    : undefined,\n  \n  // NIVEL DE LIMPIEZA\n  nivel_limpieza: String(patch.nivel_limpieza || patch.profundidad || '').trim() || null,\n  \n  // ELEMENTOS ESPECIALES (limpieza profunda)\n  elementos_especiales: has(patch, 'elementos_especiales')\n    ? (() => {\n        const value = patch.elementos_especiales;\n\n        // Array (multi-selección)\n        if (Array.isArray(value)) {\n          // Si solo viene \"ningun_elemento_especial\" => false\n          if (value.includes('ningun_elemento_especial') && value.length === 1) {\n            return false;\n          }\n          // Si por error viene mezclado, eliminamos el sentinel y dejamos el resto\n          return value.filter(v => v !== 'ningun_elemento_especial');\n        }\n\n        // Valor simple\n        if (value === 'ningun_elemento_especial') {\n          return false;\n        }\n\n        // Resto de casos normales\n        return value ? [String(value)] : [];\n      })()\n    : undefined,\n  \n  // INCENDIOS / DIOGENES\n  tirar_trastos: (\n    has(patch, 'tirar_trastos') || has(patch, 'desechos')\n  )\n    ? (patch.tirar_trastos ?? patch.desechos)\n    : undefined,\n  fecha_incendio:  String(patch.fecha_incendio || '').trim() || null,\n  \n  // FECHAS\n  fecha_inicio_posible: String(patch.fecha_inicio_posible || patch.fecha_inicio || '').trim() || null,\n  fecha_servicio:       String(patch.fecha_servicio       || patch.fecha       || '').trim() || null,\n  \n  // COMUNIDADES\n  es_un_solo_edificio: has(patch, 'es_un_solo_edificio') || has(patch, 'un_edificio')\n    ? (patch.es_un_solo_edificio ?? patch.un_edificio)\n    : undefined,\n  num_viviendas: (patch.num_viviendas || patch.viviendas)\n    ? parseInt(patch.num_viviendas || patch.viviendas)\n    : null,\n  hay_garaje: has(patch, 'hay_garaje')\n    ? patch.hay_garaje\n    : undefined,\n  rol_en_comunidad: String(patch.rol_en_comunidad || patch.rol || '').trim() || null,\n  \n  // PERIÓDICO\n  periodicidad:   String(patch.periodicidad   || patch.freq || '').trim() || null,\n  dias_servicio: has(patch, 'dias_servicio')\n    ? (Array.isArray(patch.dias_servicio)\n        ? patch.dias_servicio\n        : (patch.dias_servicio ? [String(patch.dias_servicio)] : []))\n    : undefined,\n  hora_inicio:    String(patch.hora_inicio    || patch.hora || '').trim() || null,\n  duracion_horas: (patch.duracion_horas || patch.duracion)\n    ? parseFloat(patch.duracion_horas || patch.duracion)\n    : null,\n  \n  // SUMINISTROS\n  suministros: has(patch, 'suministros')\n    ? (Array.isArray(patch.suministros)\n        ? patch.suministros\n        : (patch.suministros ? [String(patch.suministros)] : []))\n    : undefined,\n  \n  // OTROS\n  otro_servicio_descripcion: String(patch.otro_servicio_descripcion || patch.otro || '').trim() || null,\n  info_relevante: has(patch, 'info_relevante')\n    ? patch.info_relevante\n    : undefined,\n  \n  // DISPONIBILIDAD DE LLAMADA (recopilada al final)\n  fecha_preferida_llamada: String(patch.fecha_preferida_llamada || patch.fecha_pref || '').trim() || null,\n  hora_preferida_llamada:  String(patch.hora_preferida_llamada  || patch.hora_pref || '').trim() || null,\n  \n  // FALLBACK: copiar cualquier campo que no hayamos mapeado explícitamente\n  ...Object.fromEntries(\n    Object.entries(patch).filter(([key]) => ![\n      'nombre', 'apellido', 'telefono', 'email', 'intencion_principal', 'tipo_servicio',\n      'nombre_servicio', 'tipo_inmueble', 'tipo_espacio_empresa', 'tipo_empresa_cocina', 'codigo_postal',\n      'direccion', 'zonas_exteriores', 'm2_exterior', 'm2_interior', 'm2_totales', 'restos_obra',\n      'material_suelo', 'suelo_tono_blanquecino', 'muebles_electrodom', 'cristales_altura',\n      'nivel_limpieza', 'elementos_especiales', 'tirar_trastos', 'fecha_incendio', 'fecha_inicio_posible',\n      'fecha_servicio', 'es_un_solo_edificio', 'num_viviendas', 'hay_garaje', 'rol_en_comunidad',\n      'periodicidad', 'dias_servicio', 'hora_inicio', 'duracion_horas', 'suministros', 'otro_servicio_descripcion',\n      'info_relevante', 'fecha_preferida_llamada', 'hora_preferida_llamada',\n      'cliente_nombre', 'cliente_apellido', 'cliente_phone', 'cliente_email', 'necesidad',\n      'm2_ext', 'm2_int', 'm2_total', 'hay_exteriores', 'suelo_material', 'profundidad', 'muebles_estado',\n      'desechos', 'fecha_inicio', 'un_edificio', 'viviendas', 'freq', 'fecha_pref', 'hora_pref',\n      'phone', 'inmueble', 'tipo_empresa', 'tipo_cocina', 'address', 'cp', 'intension_principal'\n    ].includes(key))\n  ),\n};\n\n// 4) isBotFinal\nconst isBotFinal = out?.type === 'final' && (out?.action === 'create_call' || out?.done === true);\n\n// 5) Response to user\nconst responseToUser = out;\n\n// 6) Devolver un solo objeto\nreturn {\n  json: {\n    sessionId,\n    isBotFinal,\n    statePatch,\n    responseToUser,\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -960,
+        -736
+      ],
+      "id": "0213da5a-ef6f-4d25-a13d-f350d178438b",
+      "name": "parsear_salida_agente",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "rY2XJtpFCZ3Ef3xB",
+          "mode": "list",
+          "cachedResultName": "lead_state",
+          "cachedResultUrl": "/projects/8rHr7aLuXvLa8F5m/datatables/rY2XJtpFCZ3Ef3xB"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_id",
+              "keyValue": "={{$json.sessionId}}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        -816,
+        -736
+      ],
+      "id": "f3da6c5d-fd0e-4184-a543-206aa80ee57e",
+      "name": "Get row(s)",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Input 0: Get row(s)\n\n// ──────────────────────────────\n// Utils\n// ──────────────────────────────\nconst notEmpty = (v) =>\n  v !== undefined &&\n  v !== null &&\n  !(typeof v === 'string' && v.trim() === '') &&\n  !(Array.isArray(v) && v.length === 0);\n\nconst pick = (o, ...keys) => {\n  if (!o) return undefined;\n  for (const k of keys) {\n    if (notEmpty(o[k])) return o[k];\n  }\n  return undefined;\n};\n\n// pequeño helper para rellenar desde alias\nconst setFromPick = (target, pr, turnFlat, ...keys) => {\n  const v = pick(pr, ...keys);\n  if (notEmpty(v)) turnFlat[target] = v;\n};\n\n// ──────────────────────────────\n// Base del turno (desde parsear_salida_agente)\n// ──────────────────────────────\nconst base = ($items('parsear_salida_agente', 0, 0)?.[0]?.json) ?? {};\nconst sessionId = base.sessionId || '';\nconst responseToUser = base.responseToUser || { type: 'text', text: '' };\nconst patch = base.statePatch || {};\n\n// ──────────────────────────────\n// Leer estado previo (formato antiguo o nuevo)\n// ──────────────────────────────\nlet prev = {};\ntry {\n  const prevItem = $input.first()?.json || {};\n  prev = prevItem?.state ? JSON.parse(prevItem.state) : {};\n} catch {\n  prev = {};\n}\n\n// en estados antiguos venía como { respuestas: { ... } }\n// en los nuevos ya será plano\nconst P = prev?.respuestas || prev || {};\nconst prevFlat = { ...P };\n\n// ──────────────────────────────\n// Aplanar el parche del turno actual\n// (merge de respuestas/contacto/extras/servicio + top-level)\n// ──────────────────────────────\nconst pr = {\n  ...(patch.respuestas || {}),\n  ...(patch.contacto || {}),\n  ...(patch.extras || {}),\n  ...(patch.servicio || {}),\n  ...patch,\n};\n\nconst turnFlat = {};\n\n// contacto\nsetFromPick('nombre',  pr, turnFlat, 'nombre', 'nombre_cliente');\nsetFromPick('apellido', pr, turnFlat, 'apellido', 'apellidos');\nsetFromPick('telefono', pr, turnFlat, 'telefono', 'phone');\n\n// ✅ NORMALIZAR TELÉFONO (AQUÍ)\nif (notEmpty(turnFlat.telefono)) {\n  turnFlat.telefono = turnFlat.telefono.toString().replace(/[^\\d]/g, '');\n}\n\nconst email = pick(pr, 'email', 'correo');\nif (notEmpty(email)) {\n  turnFlat.email = email.toString().toLowerCase();\n}\n\n\n// meta / routing\n// intencion_principal la guardamos y además la usamos como intencion\nconst intencionPrincipal = pick(pr, 'intencion_principal', 'intencion');\nif (notEmpty(intencionPrincipal)) {\n  turnFlat.intencion_principal = intencionPrincipal;\n  turnFlat.intencion = intencionPrincipal;\n}\n\nsetFromPick('tipo_servicio',   pr, turnFlat, 'tipo_servicio', 'tipo');\nsetFromPick('nombre_servicio', pr, turnFlat, 'nombre_servicio', 'servicio_nombre', 'servicio');\n\n// datos generales\nsetFromPick('tipo_inmueble',        pr, turnFlat, 'tipo_inmueble');\nsetFromPick('tipo_espacio_empresa', pr, turnFlat, 'tipo_espacio_empresa');\nsetFromPick('tipo_empresa_cocina',  pr, turnFlat, 'tipo_empresa_cocina');\n\nsetFromPick('codigo_postal', pr, turnFlat, 'codigo_postal', 'cp');\nsetFromPick('direccion',     pr, turnFlat, 'direccion', 'dirección');\n\nsetFromPick('zonas_exteriores', pr, turnFlat, 'zonas_exteriores');\nsetFromPick('m2_exterior',      pr, turnFlat, 'm2_exterior');\nsetFromPick('m2_interior',      pr, turnFlat, 'm2_interior');\nsetFromPick('m2_totales',       pr, turnFlat, 'm2_totales');\n\n// final de obra / profundas / cocinas\nsetFromPick('restos_obra',          pr, turnFlat, 'restos_obra');\nsetFromPick('material_suelo',       pr, turnFlat, 'material_suelo');\nsetFromPick('suelo_tono_blanquecino', pr, turnFlat, 'suelo_tono_blanquecino');\nsetFromPick('muebles_electrodom',   pr, turnFlat, 'muebles_electrodom');\nsetFromPick('cristales_altura',     pr, turnFlat, 'cristales_altura');\n\nsetFromPick('nivel_limpieza',       pr, turnFlat, 'nivel_limpieza');\nsetFromPick('elementos_especiales', pr, turnFlat, 'elementos_especiales');\n\n// incendios / diógenes\nsetFromPick('tirar_trastos',       pr, turnFlat, 'tirar_trastos');\nsetFromPick('fecha_incendio',      pr, turnFlat, 'fecha_incendio');\nsetFromPick('fecha_inicio_posible', pr, turnFlat, 'fecha_inicio_posible');\nsetFromPick('fecha_servicio',      pr, turnFlat, 'fecha_servicio', 'fecha');\n\n// comunidades / centros / empresas\nsetFromPick('es_un_solo_edificio', pr, turnFlat, 'es_un_solo_edificio');\nsetFromPick('num_viviendas',      pr, turnFlat, 'num_viviendas');\nsetFromPick('hay_garaje',         pr, turnFlat, 'hay_garaje');\nsetFromPick('rol_en_comunidad',   pr, turnFlat, 'rol_en_comunidad');\n\nsetFromPick('periodicidad',   pr, turnFlat, 'periodicidad');\nsetFromPick('dias_servicio',  pr, turnFlat, 'dias_servicio');\nsetFromPick('hora_inicio',    pr, turnFlat, 'hora_inicio');\nsetFromPick('duracion_horas', pr, turnFlat, 'duracion_horas');\nsetFromPick('suministros',    pr, turnFlat, 'suministros');\n\n// otros / texto libre\nsetFromPick('otro_servicio_descripcion', pr, turnFlat, 'otro_servicio_descripcion');\nsetFromPick('info_relevante',           pr, turnFlat, 'info_relevante');\n\n// preferencias de llamada\nsetFromPick('fecha_preferida_llamada', pr, turnFlat, 'fecha_preferida_llamada', 'fecha_preferida');\nsetFromPick('hora_preferida_llamada',  pr, turnFlat, 'hora_preferida_llamada', 'hora_preferida');\nsetFromPick('franja_llamada', pr, turnFlat, 'franja_llamada');\n\n\n// ──────────────────────────────\n// Merge plano (previo + turno)\n// ──────────────────────────────\nconst flat = { ...prevFlat, ...turnFlat };\n\n// ──────────────────────────────\n// Normalizar a un estado PLANO con todas las claves\n// (las que no se usen en ese servicio quedan a null)\n// ──────────────────────────────\nconst canonicalKeys = [\n  // meta\n  'intencion',\n  'tipo_servicio',\n  'nombre_servicio',\n\n  // generales\n  'tipo_inmueble',\n  'tipo_espacio_empresa',\n  'tipo_empresa_cocina',\n  'codigo_postal',\n  'direccion',\n  'zonas_exteriores',\n  'm2_exterior',\n  'm2_interior',\n  'm2_totales',\n\n  // final de obra / profundas / cocinas\n  'restos_obra',\n  'material_suelo',\n  'suelo_tono_blanquecino',\n  'muebles_electrodom',\n  'cristales_altura',\n  'nivel_limpieza',\n  'elementos_especiales',\n\n  // incendios / diógenes\n  'tirar_trastos',\n  'fecha_incendio',\n  'fecha_inicio_posible',\n  'fecha_servicio',\n\n  // comunidades / centros / empresas\n  'es_un_solo_edificio',\n  'num_viviendas',\n  'hay_garaje',\n  'rol_en_comunidad',\n  'periodicidad',\n  'dias_servicio',\n  'hora_inicio',\n  'duracion_horas',\n  'suministros',\n\n  // otros\n  'otro_servicio_descripcion',\n  'info_relevante',\n\n  // contacto\n  'nombre',\n  'apellido',\n  'telefono',\n  'email',\n  'fecha_preferida_llamada',\n  'hora_preferida_llamada',\n  'franja_llamada',\n\n];\n\n// construir estado asegurando todas las claves\nconst state = {};\n\n// intencion viene de intencion o intencion_principal\nstate.intencion = notEmpty(flat.intencion)\n  ? flat.intencion\n  : (flat.intencion_principal || null);\n\n// resto de claves canónicas\nfor (const key of canonicalKeys) {\n  if (key === 'intencion') continue; // ya cubierta arriba\n  state[key] = flat.hasOwnProperty(key) ? flat[key] : null;\n}\n\n// además, añadimos cualquier otra clave que pudiera existir en flat\nfor (const [k, v] of Object.entries(flat)) {\n  if (!Object.prototype.hasOwnProperty.call(state, k)) {\n    state[k] = v;\n  }\n}\n\n// ──────────────────────────────\n// Marcar cierre solo si el bot indica mensaje final\n// ──────────────────────────────\nconst isFinal = (responseToUser?.type === 'final');\n\n// ──────────────────────────────\n// Salida: lista con un único item\n// ──────────────────────────────\nreturn [{\n  json: {\n    sessionId,\n    state,\n    state_str: JSON.stringify(state),\n    isFinal,\n    responseToUser,\n  },\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -688,
+        -736
+      ],
+      "id": "8a36a93d-32cd-4e01-aa33-46a892d1ff04",
+      "name": "merge_state"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "rY2XJtpFCZ3Ef3xB",
+          "mode": "list",
+          "cachedResultName": "lead_state",
+          "cachedResultUrl": "/projects/8rHr7aLuXvLa8F5m/datatables/rY2XJtpFCZ3Ef3xB"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_id",
+              "keyValue": "={{$json.sessionId}}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "session_id": "={{$json.sessionId}}",
+            "state": "={{$json.state_str}}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "state",
+              "displayName": "state",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        -528,
+        -992
+      ],
+      "id": "6ce14554-a624-48dd-843b-f57fc23decab",
+      "name": "Upsert row(s)",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "deleteRows",
+        "dataTableId": {
+          "__rl": true,
+          "value": "rY2XJtpFCZ3Ef3xB",
+          "mode": "list",
+          "cachedResultName": "lead_state",
+          "cachedResultUrl": "/projects/8rHr7aLuXvLa8F5m/datatables/rY2XJtpFCZ3Ef3xB"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "session_id",
+              "keyValue": "={{$json.session_id}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        464,
+        -880
+      ],
+      "id": "174f17b0-19a4-4259-aa47-55a42ff8c03e",
+      "name": "Delete row(s)",
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "735df57c-fb8f-4509-9f8e-2ac3ecaa3c60",
+              "leftValue": "={{ ($json.body?.mensaje ?? '').toLowerCase() }}",
+              "rightValue": "=test_connection",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "00e6e64b-d99c-4030-a40c-4ba886c53cfa",
+              "leftValue": "={{ ($json.body?.mensaje ?? '').toLowerCase() }}",
+              "rightValue": "__reset_session__",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "a6fb859f-da07-4eba-8711-6c89293eb044",
+              "leftValue": "={{ ($json.body?.action ?? '').toLowerCase() }}",
+              "rightValue": "reset",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "b9d1b14c-607c-4b52-ad9b-4590db93b2f0",
+              "leftValue": "={{ ($json.body?.source ?? '').toLowerCase() }}",
+              "rightValue": "health",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1376,
+        -752
+      ],
+      "id": "4ecd3b9f-d073-46fe-8455-2caba6869d5b",
+      "name": "If_healthcheck"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ type: \"text\", text: \"ok\" }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -1136,
+        -896
+      ],
+      "id": "306b7389-d1a5-4e57-aa98-bc017655794a",
+      "name": "Respond to health"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4.1-mini"
+        },
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -1280,
+        -528
+      ],
+      "id": "58b55088-a29f-46ff-b6bb-40ad82a92388",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "GRcak4piBdjPh7RV",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1FKG8xme56FkkJNRTjW2plXbotIAGK07dd0dcw6YVJYY",
+          "mode": "list",
+          "cachedResultName": "Leads MYA PROCLEAN",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1FKG8xme56FkkJNRTjW2plXbotIAGK07dd0dcw6YVJYY/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1FKG8xme56FkkJNRTjW2plXbotIAGK07dd0dcw6YVJYY/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "session_id": "={{ $json.session_id }}",
+            "nombre": "={{ $json.nombre }}",
+            "apellido": "={{ $json.apellido}}",
+            "telefono": "={{ $json.telefono }}",
+            "email": "={{ $json.email}}",
+            "resumen": "={{ $json.resumen }}",
+            "created_at": "={{ $json.created_at }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "nombre",
+              "displayName": "nombre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "apellido",
+              "displayName": "apellido",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "telefono",
+              "displayName": "telefono",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "resumen",
+              "displayName": "resumen",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        304,
+        -880
+      ],
+      "id": "83097684-10e5-4b5b-a404-ed54d7742a08",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "umUkIWNuFQIMmGih",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Eres un asistente cuyo trabajo consiste en transformar un JSON con datos de un cliente en un resumen en lenguaje natural, fácil de entender, claro y profesional.\n\nReglas:\n- Resume en 4-6 frases.\n- Habla SIEMPRE en tercera persona (“El cliente indica...”).\n- Explica qué servicio quiere, para qué inmueble o empresa, su CP, metros, nivel de suciedad y cualquier información relevante.\n- Explica si se trata de incendio, diógenes, final de obra, limpieza profunda, periódico, etc.\n- No respondas en JSON.\n- Si algún dato está vacío o nulo, ignóralo.\n",
+              "role": "system"
+            },
+            {
+              "content": "=Aquí tienes el JSON plano con todas las respuestas del cliente:\n{{ $json.state_str }}\n\nGenera un resumen en lenguaje natural siguiendo las instrucciones del mensaje del sistema.\n\n**Instrucciones**:\n1. **Elimina la pregunta \"¿Por qué tarifa fija?\"** si está presente en las respuestas.\n2. Verifica que las siguientes preguntas estén presentes y sean correctas:\n   - ¿A cuánto sale la hora?\n   - ¿Incluye productos?\n   - Formas de pago\n3. Para los **servicios periódicos**, las opciones de pago deben ser:\n   - Domiciliación bancaria\n   - Transferencia\n4. **Elimina la opción de pago con tarjeta** para los servicios periódicos.\n\nReglas:\n- Resume en 4-6 frases.\n"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        -384,
+        -880
+      ],
+      "id": "71daf4dc-8a40-4882-bbcc-b72e613aed76",
+      "name": "Message a model",
+      "credentials": {
+        "openAiApi": {
+          "id": "GRcak4piBdjPh7RV",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8eb1339d-db07-4f12-b7a4-ca52fb9821c1",
+              "name": "session_id",
+              "value": "={{ $items(\"merge_state\", 0, 0)[0].json.sessionId }}",
+              "type": "string"
+            },
+            {
+              "id": "2e04a22d-c9a1-4888-b203-0eed2cbebb5e",
+              "name": "nombre",
+              "value": "={{ $items(\"merge_state\", 0, 0)[0].json.state.nombre }}",
+              "type": "string"
+            },
+            {
+              "id": "0f041046-b30b-47b6-a0a6-294865d0bef8",
+              "name": "apellido",
+              "value": "={{ $items(\"merge_state\", 0, 0)[0].json.state.apellido }}",
+              "type": "string"
+            },
+            {
+              "id": "d38ac764-8ea5-431d-a1f1-83b938facac9",
+              "name": "telefono",
+              "value": "={{ $items(\"merge_state\", 0, 0)[0].json.state.telefono }}",
+              "type": "string"
+            },
+            {
+              "id": "28b87ef1-898c-45b8-8858-4c9147bb4d39",
+              "name": "email",
+              "value": "={{ $items(\"merge_state\", 0, 0)[0].json.state.email }}",
+              "type": "string"
+            },
+            {
+              "id": "669caf84-cefa-4745-ac0d-bf2a255d73e6",
+              "name": "resumen",
+              "value": "={{ $json.message.content }}",
+              "type": "string"
+            },
+            {
+              "id": "df7ab2a3-9466-4420-b246-0740dcf05999",
+              "name": "created_at",
+              "value": "={{ $now }}",
+              "type": "string"
+            },
+            {
+              "id": "7206767b-11e5-45f5-9d8f-d8849b436248",
+              "name": "franja_llamada",
+              "value": "={{ $items(\"merge_state\", 0, 0)[0].json.state.franja_llamada }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -96,
+        -880
+      ],
+      "id": "6c6cb027-a204-4447-b177-ce1ce01b6e9f",
+      "name": "Set_resumen_para_sheet"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dateTimeTool",
+      "typeVersion": 2,
+      "position": [
+        -976,
+        -432
+      ],
+      "id": "64a33c84-4862-4163-91cd-611e0b09aea2",
+      "name": "Date & Time"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "2ed4a200-5d6c-48e8-be7b-abd6ce8a5b11",
+              "leftValue": "={{$json.done}}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -48,
+        -400
+      ],
+      "id": "9c5c9bdb-3ce1-46c0-87ea-2ea1b8a0c062",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "sendTo": "contacto@miaproclean.es",
+        "subject": "=Nuevo lead desde la web – {{$json.nombre_servicio}}",
+        "message": "=Nuevo lead recibido desde la web de MYA Pro Clean\n\n----------------------------------\nSERVICIO\n----------------------------------\nTipo de servicio: {{$json.tipo_servicio}}\nServicio solicitado: {{$json.nombre_servicio}}\nTipo de inmueble: {{$json.tipo_inmueble}}\nCódigo postal: {{$json.codigo_postal}}\n\n----------------------------------\nCLIENTE\n----------------------------------\nNombre: {{$json.nombre}} {{$json.apellido}}\nTeléfono: {{$json.telefono}}\nEmail: {{$json.email}}\n\n----------------------------------\nLLAMADA\n----------------------------------\nFranja horaria preferida: {{\n  (Array.isArray($json.franja_llamada) ? $json.franja_llamada : [$json.franja_llamada])\n    .map(v => v === 'manana' ? 'Mañana (10:00–14:00)'\n          : v === 'tarde'  ? 'Tarde (16:00–19:00)'\n          : v === 'ambas'  ? 'Ambas franjas'\n          : v)\n    .join(', ')\n}}\nFecha preferida: {{$json.fecha_llamada}}\nHora preferida: {{$json.hora_llamada}}\n\n----------------------------------\nEste mensaje ha sido enviado automáticamente desde el chatbot web de MYA Pro Clean.\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        128,
+        -624
+      ],
+      "id": "4d4d4f2f-27a7-4616-b63d-ba6d240002e0",
+      "name": "Send a message",
+      "webhookId": "6106f4cf-ce44-44fe-89e7-8222a6acdf60",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YbWHei6GG36YZKNY",
+          "name": "info automaize"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "merge_state": [
+      {
+        "json": {
+          "sessionId": "mya-session-1763479525857-uzmy9nnmr",
+          "state": {
+            "respuestas": {
+              "contacto": {
+                "nombre": "",
+                "apellido": "",
+                "telefono": "",
+                "email": ""
+              },
+              "servicio": {
+                "intencion_principal": null,
+                "tipo_servicio": null,
+                "nombre_servicio": null
+              },
+              "extras": {
+                "codigo_postal": null,
+                "direccion": null,
+                "fecha_preferida": null,
+                "hora_preferida": null
+              },
+              "respuestas": {
+                "tipo_inmueble": "vivienda",
+                "codigo_postal": "46001",
+                "zonas_exteriores": false,
+                "m2_interior": 40
+              }
+            }
+          },
+          "state_str": "{\"respuestas\":{\"contacto\":{\"nombre\":\"\",\"apellido\":\"\",\"telefono\":\"\",\"email\":\"\"},\"servicio\":{\"intencion_principal\":null,\"tipo_servicio\":null,\"nombre_servicio\":null},\"extras\":{\"codigo_postal\":null,\"direccion\":null,\"fecha_preferida\":null,\"hora_preferida\":null},\"respuestas\":{\"tipo_inmueble\":\"vivienda\",\"codigo_postal\":\"46001\",\"zonas_exteriores\":false,\"m2_interior\":40}}}",
+          "isFinal": false,
+          "rpcPayload": null,
+          "responseToUser": {
+            "type": "quick_replies",
+            "text": "¿Hay que tirar trastos, desechos y/o escombros?",
+            "replies": [
+              {
+                "label": "Sí",
+                "value": "si_tirar_trastos"
+              },
+              {
+                "label": "No, ya está vacío",
+                "value": "no_tirar_trastos"
+              }
+            ],
+            "multi": false,
+            "save_patch": {
+              "m2_interior": 40
+            }
+          }
+        }
+      }
+    ],
+    "Webhook": [
+      {
+        "json": {
+          "headers": {
+            "host": "mya-proclean-n8n.3qihsu.easypanel.host",
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36",
+            "content-length": "707",
+            "accept": "application/json",
+            "accept-encoding": "gzip, deflate, br, zstd",
+            "accept-language": "es-ES,es;q=0.9",
+            "content-type": "application/json",
+            "origin": "https://id-preview--cb1a4c5a-2e32-471c-a3b6-530387fded20.lovable.app",
+            "priority": "u=1, i",
+            "referer": "https://id-preview--cb1a4c5a-2e32-471c-a3b6-530387fded20.lovable.app/",
+            "sec-ch-ua": "\"Chromium\";v=\"142\", \"Google Chrome\";v=\"142\", \"Not_A Brand\";v=\"99\"",
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": "\"Windows\"",
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "cross-site",
+            "x-forwarded-for": "81.61.16.9",
+            "x-forwarded-host": "mya-proclean-n8n.3qihsu.easypanel.host",
+            "x-forwarded-port": "443",
+            "x-forwarded-proto": "https",
+            "x-forwarded-server": "643affcae330",
+            "x-real-ip": "81.61.16.9"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "sessionId": "mya-session-1763557905511-r9aei53hj",
+            "mensaje": "contratar_servicio",
+            "chatHistory": [
+              {
+                "role": "user",
+                "text": "Eres un asistente virtual para una empresa de limpieza llamada MYA PRO CLEAN. Tu nombre es 'Asistente MYA'. Eres profesional, amable y muy eficiente. Tu objetivo es ayudar a los usuarios, responder a sus preguntas sobre servicios de limpieza y generar presupuestos estimados. Usa los colores corporativos: azul noche (#1C2040) y dorado (#D7AA45). Responde siempre en español."
+              },
+              {
+                "role": "model",
+                "text": "Entendido. Soy el Asistente MYA de MYA PRO CLEAN. Estoy listo para ayudar."
+              },
+              {
+                "role": "user",
+                "text": "contratar_servicio"
+              }
+            ],
+            "timestamp": "2025-11-19T13:19:31.406Z",
+            "source": "mya-chatbot"
+          },
+          "webhookUrl": "https://mya-proclean-n8n.3qihsu.easypanel.host/webhook/agente_texto",
+          "executionMode": "production"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "MYA": {
+      "main": [
+        [
+          {
+            "node": "parsear_salida_agente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "MYA",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "If_healthcheck",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "parsear_salida_agente": {
+      "main": [
+        [
+          {
+            "node": "Get row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "merge_state": {
+      "main": [
+        [
+          {
+            "node": "Upsert row(s)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s)": {
+      "main": [
+        [
+          {
+            "node": "merge_state",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert row(s)": {
+      "main": [
+        []
+      ]
+    },
+    "Delete row(s)": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If_healthcheck": {
+      "main": [
+        [
+          {
+            "node": "Respond to health",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "MYA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "MYA",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Delete row(s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Set_resumen_para_sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set_resumen_para_sheet": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Date & Time": {
+      "ai_tool": [
+        [
+          {
+            "node": "MYA",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Set_resumen_para_sheet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Madrid",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "1cc7da78-185e-4f87-a86a-718b0720fef8",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "47020dacb1edd8a363c802129f587c8fba0fb2bcb27e5daa6606c7f0fc86e520"
+  },
+  "id": "hYZA9RgBLPKgRfFQ",
+  "tags": []
+}
